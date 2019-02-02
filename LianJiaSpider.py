@@ -116,7 +116,7 @@ def _get_info_in_per_url_loupan(soup):
 
 	house_info = soup.select('.x-box li')
 	house_dict =  {pi.contents[1].text[:-1]: str_regular(pi.contents[3].text)
-				   for pi in house_info}
+				   for pi in house_info[:-1]}
 
 	inform = dict(inform, **house_dict)
 	return inform
@@ -290,6 +290,8 @@ def LianjiaTotal(dist_name, dist_area, type, file_path, attemp_times=10):
 
 	for i in range(nums):
 		dn = LianJiaMap[dist_name[i]]
+		if dn is None:
+			dn = 'suzhou'
 		if dist_area[i] is None:
 			da = ''
 		else:
@@ -318,7 +320,7 @@ if __name__ == '__main__':
 	for k, v in LianJiaMap.items():
 		print(k, v)
 
-	# url = 'https://su.fang.lianjia.com/loupan/'
+	url = 'https://su.fang.lianjia.com/loupan/'
 	# data = grasp(url, method='requests', is_agent=True)
 	# soup = BeautifulSoup(data, 'html.parser')
 
@@ -336,9 +338,13 @@ if __name__ == '__main__':
 	# urlist = soup.select('.resblock-name a')
 	# page_url = [pg_url['href'] for pg_url in urlist]
 
-	# urls = get_urls_in_per_url(url, 'loupan', True )
+	urls = get_urls_in_per_url(url, 'loupan', True )
 
+	# data = grasp(urls[0], method='requests', is_agent=True)
+	# soup = BeautifulSoup(data, 'html.parser')
+
+	# house_info = soup.select('.x-box li')
 	# urls = get_urls_in_per_url(url3, 'ershoufang')
 	#
 	#
-	# infs = get_info_in_per_url(urls[0], type='ershoufang', verbose=False)
+	infs = get_info_in_per_url(urls[0], type='loupan', verbose=False)
