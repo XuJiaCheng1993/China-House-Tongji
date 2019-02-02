@@ -17,9 +17,10 @@ import re
 import time
 import os
 import pandas as pd
+import gc
 
-
-LianJiaMap = {'昆山':'kunshan',
+LianJiaMap = {'苏州大市':None,
+              '昆山':'kunshan',
               '高新':'gaoxing1',
               '吴中':'wuzhong',
               '相城':'xiangcheng',
@@ -99,44 +100,26 @@ def NavigableString2str(nstring):
 	except:
 		return ''
 
-def crawler_sleep():
-	time.sleep(0.5 * random.random() + 0.5)
+def str_regular(string):
+	s = ''
+	for si	in string.split('\n'):
+		for sii in si.split():
+			s += sii + ' '
+	return s[:-1]
 
-# def get_chengjiao_url_info(url):
-# 	data = grasp(url, method='requests', is_agent=True)
-# 	try:
-# 		soup = BeautifulSoup(data, 'html.parser')
-# 		# 房屋名 成交日期 均价 总价
-# 		house_title = soup.select('.house-title')[0].text.split()[0]
-#
-# 		record_datail = soup.select('p.record_detail')
-# 		record_number = [n for n in re.findall("[0-9]*", record_datail[0].text) if n.__len__()>0]
-#
-# 		price = soup.select('.info.fr i')[0].text
-# 		inform = {'屋名':house_title,
-# 		          '均价': record_number[0],
-# 		          '成交日期':'{0}-{1}-{2}'.format(record_number[1], record_number[2], record_number[3]),
-# 		          '总价':price,
-# 		          }
-#
-# 		# 成交信息
-# 		price_info = soup.select('.info.fr span')[1:]
-# 		price_dict = {NavigableString2str(pi.contents[1]):pi.contents[0].text
-# 		              for pi in price_info}
-# 		inform = dict(inform, **price_dict)
-#
-# 		# 房屋信息
-# 		house_base_info = soup.select('.base li')
-# 		house_transaction_info = soup.select('.transaction li')
-# 		house_dict = {pi.contents[0].text:NavigableString2str(pi.contents[1])
-# 		              for pi in house_base_info + house_transaction_info}
-#
-# 		inform = dict(inform, **house_dict)
-# 	except Exception as e:
-# 		inform = {}
-# 		# print('Wrong in', url, '!\n', e)
-#
-# 	return inform
+def crawler_sleep():
+	time.sleep(0.2 * random.random() + 0.1)
+
+def _get_info_in_per_url_loupan(soup):
+	name = soup.select('.fl.l-txt')
+	inform = {'楼盘名称':name[0].contents[10].text}
+
+	house_info = soup.select('.x-box li')
+	house_dict =  {pi.contents[1].text[:-1]: str_regular(pi.contents[3].text)
+				   for pi in house_info}
+
+	inform = dict(inform, **house_dict)
+	return inform
 
 def _get_info_in_per_url_ershoufang(soup):
 	inform = {}
@@ -152,7 +135,7 @@ def _get_info_in_per_url_ershoufang(soup):
 
 	house_info = soup.select('.content li')[:20]
 	house_dict = dict({pi.contents[0].text: NavigableString2str(pi.contents[1]) for pi in house_info[:12]},
-	                  **{pi.contents[1].text: pi.contents[3].text for pi in house_info[12:]})
+	                  **{pi.contents[1].text: str_regular(pi.contents[3].text) for pi in house_info[12:]})
 
 	inform = dict(inform, **house_dict)
 	return inform
@@ -206,6 +189,13 @@ def get_info_in_per_url(url, type='chengjiao', verbose=False):
 				inform = {}
 				if verbose:
 					print(e)
+		elif type == 'loupan':
+			try:
+				inform = _get_info_in_per_url_loupan(soup)
+			except Exception as e:
+				inform = {}
+				if verbose:
+					print(e)
 		else:
 			inform = {}
 	return inform
@@ -215,6 +205,8 @@ def get_urls_in_per_url(url, type='chengjiao', verbose=False):
 		select_key = '.listContent li a'
 	elif type == 'ershoufang':
 		select_key = '.sellListContent li a'
+	elif type == 'loupan':
+		select_key = '.resblock-name a'
 	else:
 		return []
 
@@ -223,7 +215,13 @@ def get_urls_in_per_url(url, type='chengjiao', verbose=False):
 		soup = BeautifulSoup(data, 'html.parser')
 		url_info =  soup.select(select_key)
 		page_url = [pg_url['href'] for pg_url in url_info]
-		urls = [f for f in list(set(page_url)) if f.find('.html') >=0]
+		if type in ['chengjiao', 'ershoufang']:
+			urls = [f for f in list(set(page_url)) if f.find('.html') >=0]
+		elif type in ['loupan', ]:
+			origin_url = 'https://su.lianjia.com/'
+			urls = [origin_url + f + 'xiangqing/' for f in list(set(page_url))]
+		else:
+			urls = []
 	except Exception as e:
 		urls = []
 		if verbose:
@@ -234,7 +232,11 @@ def get_district_information(district='kunshan', area=None, type='chengjiao', ma
 	origin_url = 'https://su.lianjia.com/'
 
 	try:
-		dist = LianJiaMap[district] + '/pg'
+		dist = LianJiaMap[district]
+		if dist is None:
+			dist = 'pg'
+		else:
+			dist += '/pg'
 	except Exception as e:
 		print(e)
 		return [], []
@@ -251,10 +253,10 @@ def get_district_information(district='kunshan', area=None, type='chengjiao', ma
 		ct = 0
 		while not page_url:
 			page_url = get_urls_in_per_url(url, type, verbose)
-			crawler_sleep()
 			ct += 1
 			if ct >= attemp_times:
 				break
+		crawler_sleep()
 		if not page_url:
 			break
 		page_url = list(set(page_url))
@@ -267,15 +269,17 @@ def get_district_information(district='kunshan', area=None, type='chengjiao', ma
 		tmp = []
 		ct = 0
 		while not tmp:
-			tmp = get_info_in_per_url(urls[i])
-			crawler_sleep()
+			tmp = get_info_in_per_url(urls[i], type, verbose)
 			ct += 1
 			if ct >= attemp_times:
 				break
+		crawler_sleep()
 		if tmp:
 			informs.append(tmp)
 		else:
 			failed_ulr.append(urls[i])
+
+	gc.collect()
 
 	return informs, failed_ulr
 
@@ -314,6 +318,10 @@ if __name__ == '__main__':
 	for k, v in LianJiaMap.items():
 		print(k, v)
 
+	# url = 'https://su.fang.lianjia.com/loupan/'
+	# data = grasp(url, method='requests', is_agent=True)
+	# soup = BeautifulSoup(data, 'html.parser')
+
 	# get_district_information(type='ershoufang', area='A1')
 
 	# url1 = 'https://su.lianjia.com/ershoufang/107100591525.html'
@@ -325,7 +333,12 @@ if __name__ == '__main__':
 	# data = grasp(url3, method='requests', is_agent=True)
 	# soup = BeautifulSoup(data, 'html.parser')
 	#
-	# urlist = soup.select('.sellListContent li a')
+	# urlist = soup.select('.resblock-name a')
 	# page_url = [pg_url['href'] for pg_url in urlist]
 
+	# urls = get_urls_in_per_url(url, 'loupan', True )
+
 	# urls = get_urls_in_per_url(url3, 'ershoufang')
+	#
+	#
+	# infs = get_info_in_per_url(urls[0], type='ershoufang', verbose=False)
