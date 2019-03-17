@@ -10,9 +10,11 @@
 # MaxThreads = 64  # 最大线程数，依据电脑性能修改，性能好的电脑可以设置高一点
 #                  # 最好设置为2的n次方，别问我为什么，我也不知道，这是玄学
 
-MinSleep, MaxSleep = 0.01, 0.3
+MinSleep, MaxSleep = 0.1, 0.3
 TimeOut = 10
 MaxThread = 64
+ProxysNum = 10
+Proxys = False
 
 # 头部代理S
 UserAgents = [

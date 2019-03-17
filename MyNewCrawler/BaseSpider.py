@@ -5,15 +5,17 @@ __title__ = ''
 __author__ = 'JiaChengXu'
 __mtime__ = '2019/3/11'
 """
-
+import threadpool
+import os
 import threading
 import random
 import requests
-from .Config import *
 import time
 import datetime
 from .Logging import Logger
 from bs4 import BeautifulSoup
+from .Config import *
+from .Proxys import creat_proxys
 
 
 class BaseSpider(object):
@@ -41,8 +43,11 @@ class BaseSpider(object):
 
 	def grasp(self, url):
 		headers = {'User-Agent': random.choice(UserAgents)}
+		proxies = creat_proxys() if Proxys else {}
+		if proxies:
+			proxies = random.choice(proxies)
 		try:
-			res = requests.get(url, headers=headers, timeout=TimeOut)
+			res = requests.get(url, headers=headers, proxies=proxies, timeout=TimeOut)
 			html = res.text
 		except:
 			html = None
@@ -70,13 +75,16 @@ class BaseSpider(object):
 	def __get_info_in_per_url_chengjiao(self, soup):
 		pass
 
-	def get_info_in_per_url(self, url, type_='chengjiao', fmt='csv'):
+	def get_urls_in_per_url(self, url, type_):
+		pass
+
+	def get_info_in_per_url(self, url, type_, fmt='csv'):
 		data = self.grasp(url)
 		if data is None:
 			return []
 
 		if type_ not in self.function_map.keys():
-			self.logger.info('未知形式%s' % type_)
+			self.logger.info('收集网页信息时，未知形式%s' % type_)
 			return []
 
 		soup = BeautifulSoup(data, 'lxml')
@@ -85,24 +93,103 @@ class BaseSpider(object):
 			info_list = func(soup)
 			if fmt == 'csv':
 				inform = self.List2String(info_list)
-				if isinstance(self.title, list):
-					self.title = self.List2String(self.title)
 			else:
 				inform = info_list
 		except Exception as error_info:
 			inform = []
-			self.logger.info('提取网页%s内容时发生错误' % url)
-			self.logger.error(error_info)
-
+			self.logger.info('提取网页%s内容时发生错误, 使用函数%s' % (url, func))
+			self.logger.exception(error_info)
 		return inform
 
-	def get_num_of_pages(self, url, types_):
+	def __collect_and_save_urls(self, url):
+		urls, ct = [], 0
+		while not urls:
+			urls = self.get_urls_in_per_url(url, self.type_)
+			ct += 1
+			if ct >= self.re_conncet:
+				break
+		if urls:
+			for u in urls:
+				if u:
+					self.mutex.acquire()
+					self.url_file.write(u + '\n')
+					self.num_of_url_records += 1
+					self.mutex.release()
+
+	def __run_for_urls(self, url_file, page_url_list):
+		self.num_of_url_records = 0
+		with open(url_file, 'a+', encoding='utf-8-sig') as self.url_file:
+			arg = zip(zip(page_url_list), [None, ] * len(page_url_list))
+			pool = threadpool.ThreadPool(MaxThread)
+			my_requests = threadpool.makeRequests(self.__collect_and_save_urls, arg)
+			[pool.putRequest(req) for req in my_requests]
+			pool.wait()
+			pool.dismissWorkers(MaxThread, do_join=True)  # 完成后退出
+
+	def __collect_and_save_info_in_per_url(self, url):
+		info, ct = [], 0
+		while not info:
+			info = self.get_info_in_per_url(url, self.type_)
+			ct += 1
+			if ct >= self.re_conncet:
+				break
+		if info:
+			self.mutex.acquire()
+			self.info_file.write(self.date_string + "," + info + "\n")
+			self.num_of_records += 1
+			self.mutex.release()
+
+	def __run_for_information(self, url_file, info_file):
+		with open(url_file, 'rb') as file:
+			lines = file.readlines()
+		urls = [line.decode().split('\ufeff')[-1].split('\r')[0] for line in lines]
+		urls = list(set(urls))
+
+		with open(info_file, 'w+', encoding='utf-8-sig') as self.info_file:
+			if self.title is not None:
+				if isinstance(self.title, list):
+					title = self.List2String(self.title)
+					self.info_file.write("采集时间," + title + "\n")
+			arg = zip(zip(urls), [None, ] * len(urls))
+			pool = threadpool.ThreadPool(MaxThread)
+			my_requests = threadpool.makeRequests(self.__collect_and_save_info_in_per_url, arg)
+			[pool.putRequest(req) for req in my_requests]
+			pool.wait()
+			pool.dismissWorkers(MaxThread, do_join=True)  # 完成后退出
+
+
+	def _get_save_file_name(self):
 		pass
 
-	def get_urls_in_per_url(self, url, type_='chengjiao'):
+	def _get_url_list_for_run(self, area, conditions):
 		pass
+
+	def run(self, mode, area=None, conditions=None):
+		url_file, info_file = self._get_save_file_name()
+		if not os.path.exists(self.date_path):
+			os.makedirs(self.date_path)
+
+		text_ = '爬虫%s启动, 收集%s%s的%s信息中......' % (self.name, self.city, self.type_, mode)
+		print(text_)
+		self.logger.info(text_)
+		t0 = time.time()
+		if mode == 'url':
+			page_url_list = self._get_url_list_for_run(area, conditions)
+			self.__run_for_urls(url_file, page_url_list)
+			records = self.num_of_url_records
+		else:
+			self.__run_for_information(url_file, info_file)
+			records = self.num_of_records
+		dt = time.time() - t0
+		text_ = '爬取结束, 成功采集%d条数据, 共耗时%.2f秒, 平均速度%.2f条/秒!'% (records, dt, records / dt)
+		print(text_)
+		self.logger.info(text_)
 
 	@property
 	def function_map(self):
-		return dict(loupan=self.__get_info_in_per_url_loupan, chengjiao=self.__get_info_in_per_url_chengjiao,
-		            ershoufang=self.__get_info_in_per_url_ershoufang, zufang=self.__get_info_in_per_url_zufang)
+		Maps = {'二手房': self.__get_info_in_per_url_ershoufang,
+		        '新房': self.__get_info_in_per_url_loupan,
+		        '成交': self.__get_info_in_per_url_chengjiao,
+		        '租房': self.__get_info_in_per_url_zufang}
+
+		return {self.TypesMap[i]: Maps[i] for i in ['二手房', '新房', '成交', '租房']}
