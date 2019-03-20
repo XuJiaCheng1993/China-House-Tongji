@@ -19,8 +19,8 @@ class WoAiWoJiaSpider(BaseSpider):
 	            '成交': ['小区', '户型', '总价', '均价', '成交日期', '楼层', '朝向', '商圈'],
 	            '租房': ['租金', '户型', '面积', '支付方式', '年代', '出租方式', '行政区', '商圈', '小区']}
 
-	def __init__(self, name='', file_path='./', city='苏州',types='二手房', pages=None):
-		super(WoAiWoJiaSpider, self).__init__(name=self.Name + name, filepath=file_path)
+	def __init__(self, name='', file_path='./', city='苏州',types='二手房', pages=None, re_connect=5):
+		super(WoAiWoJiaSpider, self).__init__(name=self.Name + name, filepath=file_path, re_connect=re_connect)
 		self.pages = pages
 		if city in self.CityMap.keys():
 			self.city = self.CityMap[city]
@@ -70,6 +70,7 @@ class WoAiWoJiaSpider(BaseSpider):
 		return information
 
 	def __get_info_in_per_url_loupan(self, soup):
+
 		detail_0 = soup.select('.menu li')
 		detail_0 = [d.text.split('楼盘')[0] for d in detail_0][-2:]
 
@@ -79,11 +80,22 @@ class WoAiWoJiaSpider(BaseSpider):
 			price += i
 
 		detail_2 = soup.select('.style_list  .txtList .txt')
-		detail_2 = [d.text for d in detail_2]
-		wy = detail_2[0].split()[0]
-		d2 = [d for i, d in enumerate(detail_2) if i in [1, 2, 3, 6, 7]]
+		detail_2 = [d.text.split(',')[0] for d in detail_2]
+		detail_3 = soup.select('.style_list  .txtList label')[2:]
+		detail_3 = [d.text for d in detail_3]
+
+		wy = detail_2[0].split()[0].split(',')[0]
+
+		d2 = ['', ] * 5
+		for i, key in enumerate(['交房时间', '销售状态', '产权年限', '绿化率', '容积率']):
+			if key in detail_3:
+				idx = detail_3.index(key)
+				d2[i] = detail_2[idx]
 
 		information = detail_0 + [price, wy] + d2
+		if sum(len(f) for f in information) <= 0:
+			information = []
+
 
 		return information
 
@@ -126,6 +138,7 @@ class WoAiWoJiaSpider(BaseSpider):
 			else:
 				origin_url = 'https://fang.5i5j.com'
 			urls = [origin_url + f for f in list(set(page_url))]
+
 		except Exception as error_info:
 			urls = []
 			self.logger.error(error_info)
@@ -136,12 +149,9 @@ class WoAiWoJiaSpider(BaseSpider):
 			self.logger.info("Unknown %s! Set pages to 1" % types_)
 			return 1
 
-		html, ct = None, 0
-		while html is None:
-			html = self.grasp(url)
-			ct += 1
-			if ct > self.re_conncet:
-				return 1
+		html = self.grasp(url)
+		if html is None:
+			return 1
 
 		soup = BeautifulSoup(html, 'lxml')
 		try:

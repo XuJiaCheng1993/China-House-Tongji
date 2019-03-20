@@ -16,6 +16,7 @@ from .Logging import Logger
 from bs4 import BeautifulSoup
 from .Config import *
 from .Proxys import creat_proxys
+from tqdm import tqdm
 
 
 class BaseSpider(object):
@@ -30,9 +31,9 @@ class BaseSpider(object):
 			String += info + symbol
 		return String[:-len(symbol)]
 
-	def __init__(self, name=' ', filepath='./'):
+	def __init__(self, name=' ', filepath='./', re_connect=5):
 		self.name = name
-		self.re_conncet = 5
+		self.re_connect = re_connect
 		today = datetime.datetime.now()
 		self.date_string = today.strftime('%Y-%m-%d')
 		self.date_path = filepath + today.strftime('%Y_%m_%d')
@@ -42,17 +43,23 @@ class BaseSpider(object):
 		self.__start_logger()
 
 	def grasp(self, url):
-		headers = {'User-Agent': random.choice(UserAgents)}
-		proxies = creat_proxys() if Proxys else {}
-		if proxies:
-			proxies = random.choice(proxies)
 		try:
-			res = requests.get(url, headers=headers, proxies=proxies, timeout=TimeOut)
-			html = res.text
+			for i in range(self.re_connect):
+				headers = {'User-Agent': random.choice(UserAgents),
+				           }
+				proxies = creat_proxys() if Proxys else {}
+				if proxies:
+					proxies = random.choice(proxies)
+				self.sleeping()
+				result = requests.get(url, headers=headers, proxies=proxies, timeout=TimeOut)
+				status = result.status_code
+				if status == 200:
+					break
+				self.logger.info('无法 得到 网页 %s 响应 Status %s' % (url, status))
+			html = result.text
 		except:
 			html = None
 			self.logger.info('无法 得到 网页 %s 响应' % url)
-		self.sleeping()
 		return html
 
 	def sleeping(self):
@@ -102,21 +109,19 @@ class BaseSpider(object):
 		return inform
 
 	def __collect_and_save_urls(self, url):
-		urls, ct = [], 0
-		while not urls:
-			urls = self.get_urls_in_per_url(url, self.type_)
-			ct += 1
-			if ct >= self.re_conncet:
-				break
+		urls = self.get_urls_in_per_url(url, self.type_)
+
 		if urls:
+			self.mutex.acquire()
 			for u in urls:
 				if u:
-					self.mutex.acquire()
 					self.url_file.write(u + '\n')
-					self.num_of_url_records += 1
-					self.mutex.release()
+			self.num_of_url_records += 1
+			self.pbar.update(1)
+			self.mutex.release()
 
 	def __run_for_urls(self, url_file, page_url_list):
+		self.pbar = tqdm(total=len(page_url_list), desc='Collect URLs')
 		self.num_of_url_records = 0
 		with open(url_file, 'a+', encoding='utf-8-sig') as self.url_file:
 			arg = zip(zip(page_url_list), [None, ] * len(page_url_list))
@@ -125,18 +130,17 @@ class BaseSpider(object):
 			[pool.putRequest(req) for req in my_requests]
 			pool.wait()
 			pool.dismissWorkers(MaxThread, do_join=True)  # 完成后退出
+		self.pbar.close()
 
 	def __collect_and_save_info_in_per_url(self, url):
-		info, ct = [], 0
-		while not info:
-			info = self.get_info_in_per_url(url, self.type_)
-			ct += 1
-			if ct >= self.re_conncet:
-				break
+
+		info = self.get_info_in_per_url(url, self.type_)
+
 		if info:
 			self.mutex.acquire()
 			self.info_file.write(self.date_string + "," + info + "\n")
 			self.num_of_records += 1
+			self.pbar.update(1)
 			self.mutex.release()
 
 	def __run_for_information(self, url_file, info_file):
@@ -145,6 +149,7 @@ class BaseSpider(object):
 		urls = [line.decode().split('\ufeff')[-1].split('\r')[0] for line in lines]
 		urls = list(set(urls))
 
+		self.pbar = tqdm(total=len(urls), desc='Collect Data')
 		with open(info_file, 'w+', encoding='utf-8-sig') as self.info_file:
 			if self.title is not None:
 				if isinstance(self.title, list):
@@ -156,6 +161,7 @@ class BaseSpider(object):
 			[pool.putRequest(req) for req in my_requests]
 			pool.wait()
 			pool.dismissWorkers(MaxThread, do_join=True)  # 完成后退出
+		self.pbar.close()
 
 
 	def _get_save_file_name(self):

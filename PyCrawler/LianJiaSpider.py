@@ -21,10 +21,12 @@ class LianjiaSpider(BaseSpider):
 	            '租房': ['行政区', '商圈', '小区', '上架时间', '房源编号', '租金', '租赁方式', '户型', '面积', '朝向']}
 
 
-	def __init__(self, name='', file_path='./', city='苏州', types='二手房', pages=None):
-		super(LianjiaSpider, self).__init__(name=self.Name + name,
-		                                    filepath=file_path)
-		self.pages = [pages if pages < self.LimitPages else self.LimitPages][0]
+	def __init__(self, name='', file_path='./', city='苏州', types='二手房', pages=None, re_connect=5):
+		super(LianjiaSpider, self).__init__(name=self.Name + name, filepath = file_path, re_connect=re_connect)
+		if pages is not None:
+			self.pages = [pages if pages < self.LimitPages else self.LimitPages][0]
+		else:
+			self.pages = pages
 		if city in self.CityMap.keys():
 			self.city = self.CityMap[city]
 		else:
@@ -35,6 +37,8 @@ class LianjiaSpider(BaseSpider):
 			self.type_ = self.TypesMap[types]
 		else:
 			self.logger.info('初始化时,未知形式%s' % types)
+
+
 
 	def __get_info_in_per_url_chengjiao(self, soup):
 		detail_1 = soup.select('.wrapper .deal-bread a')
@@ -137,12 +141,9 @@ class LianjiaSpider(BaseSpider):
 			self.logger.info("Unknown %s! Set pages to 1" %types_)
 			return 1
 
-		html, ct = None, 0
-		while html is None:
-			html = self.grasp(url)
-			ct += 1
-			if ct > self.re_conncet:
-				return 1
+		html = self.grasp(url)
+		if html is None:
+			return 1
 
 		soup = BeautifulSoup(html, "lxml")
 
@@ -189,13 +190,15 @@ class LianjiaSpider(BaseSpider):
 		return urls
 
 	def _get_url_list_for_run(self, area=None, conditions=None):
-
 		# url = 'https://su.lianjia.com/ershoufang/'
 		# url = 'https://su.lianjia.com/chengjiao/'
 		# url = 'https://su.lianjia.com/zufang/'
 		# url = 'https://su.fang.lianjia.com/loupan/'
+		if self.type_ in [self.TypesMap[f] for f in ['成交', '二手房', '租房']]:
+			original_url = 'https://%s.lianjia.com/%s/' % (self.city, self.type_)
+		else:
+			original_url = 'https://%s.fang.lianjia.com/%s/' % (self.city, self.type_)
 
-		original_url = 'https://%s.lianjia.com/%s/' % (self.city, self.type_)
 		temp = original_url
 		if area is not None:
 			temp += '%s/' % area
