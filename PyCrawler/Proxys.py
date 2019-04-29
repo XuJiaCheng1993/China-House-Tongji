@@ -35,3 +35,5 @@ def creat_proxys():
 
 	return proxys_src
 
+if __name__ == '__main__':
+	proxys = creat_proxys()

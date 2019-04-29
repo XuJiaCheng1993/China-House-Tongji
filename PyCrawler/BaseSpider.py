@@ -17,6 +17,15 @@ from bs4 import BeautifulSoup
 from .Config import *
 from .Proxys import creat_proxys
 from tqdm import tqdm
+from requests.utils import cookiejar_from_dict
+
+
+def generate_session_id():
+	string = 'abcdefghijklmnopqrstuvwxyz0123456789'
+	id = ''
+	for i in range(26):
+		id += random.choice(string)
+	return id
 
 
 class BaseSpider(object):
@@ -38,25 +47,31 @@ class BaseSpider(object):
 		self.date_string = today.strftime('%Y-%m-%d')
 		self.date_path = filepath + today.strftime('%Y_%m_%d')
 		self.num_of_records = 0
+		self.err_times = 0
 		self.title = None
 		self.mutex = threading.Lock()  # 创建锁
 		self.__start_logger()
 
 	def grasp(self, url):
 		try:
+			html = None
 			for i in range(self.re_connect):
 				headers = {'User-Agent': random.choice(UserAgents),
 				           }
 				proxies = creat_proxys() if Proxys else {}
 				if proxies:
 					proxies = random.choice(proxies)
+
 				self.sleeping()
-				result = requests.get(url, headers=headers, proxies=proxies, timeout=TimeOut)
+				result = requests.get(url, headers=headers, proxies=proxies, timeout=TimeOut,
+				                      )
 				status = result.status_code
 				if status == 200:
+					html = result.text
 					break
 				self.logger.info('无法 得到 网页 %s 响应 Status %s' % (url, status))
-			html = result.text
+				self.logger.info(result.text)
+
 		except:
 			html = None
 			self.logger.info('无法 得到 网页 %s 响应' % url)
@@ -136,12 +151,16 @@ class BaseSpider(object):
 
 		info = self.get_info_in_per_url(url, self.type_)
 
+		self.mutex.acquire()
 		if info:
-			self.mutex.acquire()
 			self.info_file.write(self.date_string + "," + info + "\n")
 			self.num_of_records += 1
 			self.pbar.update(1)
-			self.mutex.release()
+		else:
+			self.err_times += 1
+		self.mutex.release()
+
+
 
 	def __run_for_information(self, url_file, info_file):
 		with open(url_file, 'rb') as file:
