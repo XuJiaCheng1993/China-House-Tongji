@@ -5,9 +5,9 @@ __title__ = ''
 __author__ = 'JiaChengXu'
 __mtime__ = '2019/3/25'
 """
-from .BaseSpider import BaseSpider
+from .spider_bases import BaseSpider
 from bs4 import BeautifulSoup
-from .Config import *
+from .configs import *
 import threadpool
 
 

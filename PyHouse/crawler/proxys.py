@@ -7,7 +7,7 @@ __mtime__ = '2019/3/17'
 """
 import requests
 import random
-from .Config import *
+from .configs import *
 from bs4 import BeautifulSoup
 
 def creat_proxys():

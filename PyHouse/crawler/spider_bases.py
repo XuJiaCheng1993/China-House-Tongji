@@ -12,10 +12,10 @@ import random
 import requests
 import time
 import datetime
-from .Logging import Logger
+from .loggings import Logger
 from bs4 import BeautifulSoup
-from .Config import *
-from .Proxys import creat_proxys
+from .configs import *
+from .proxys import creat_proxys
 from tqdm import tqdm
 from requests.utils import cookiejar_from_dict
 

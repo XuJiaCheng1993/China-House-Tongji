@@ -7,8 +7,8 @@ __mtime__ = '2019/3/18'
 """
 
 import json
-from PyCrawler.LianJiaSpider import LianjiaSpider
-from PyCrawler.WoAiWoJiaSpider import WoAiWoJiaSpider
+from PyHouse.crawler import LianjiaSpider
+from PyHouse.crawler import WoAiWoJiaSpider
 
 with open('./MyConfig.txt', 'r') as file_obj:
 	myconfigs = json.load(file_obj)

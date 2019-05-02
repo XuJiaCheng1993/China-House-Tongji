@@ -7,7 +7,7 @@ __mtime__ = '2019/3/19'
 """
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from .Config import UserAgents
+from .configs import UserAgents
 import random
 
 phantomjs_driver_path = r'D:\phantomjs-2.1.1-windows\phantomjs-2.1.1-windows\bin\phantomjs.exe',
