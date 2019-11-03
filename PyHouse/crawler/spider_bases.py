@@ -29,6 +29,11 @@ def generate_session_id():
 
 
 class BaseSpider(object):
+	''' 爬虫基类
+
+	'''
+
+
 	TypesMap = {'二手房': 'ershoufang', '新房': 'loupan', '成交': 'chengjiao', '租房': 'zufang'}
 	LimitPages = 10000000
 	PerInPages = {k: v for k, v in zip(TypesMap.values(), [30, 10, 30, 30])}
@@ -53,6 +58,11 @@ class BaseSpider(object):
 		self.__start_logger()
 
 	def grasp(self, url):
+		''' 类方法， 抓取网页信息
+		:param url: str
+			网页链接
+		:return:
+		'''
 		try:
 			html = None
 			for i in range(self.re_connect):
@@ -78,10 +88,14 @@ class BaseSpider(object):
 		return html
 
 	def sleeping(self):
+		''' 类方法， 爬虫休眠，在configs文件中设置最大最小休眠时间
+		'''
 		if MaxSleep > 0:
 			time.sleep((MaxSleep - MinSleep) * random.random() + MinSleep)
 
 	def __start_logger(self):
+		''' 类方法， 启动日志
+		'''
 		self.logger = Logger(self.date_path + '/', self.name).get_logger()
 		self.logger.info('爬虫%s开始启动：' % self.name)
 
@@ -98,9 +112,13 @@ class BaseSpider(object):
 		pass
 
 	def get_urls_in_per_url(self, url, type_):
+		''' 类方法， 提取网页上的链接信息
+		'''
 		pass
 
 	def get_info_in_per_url(self, url, type_, fmt='csv'):
+		''' 类方法， 提取网页上的具体信息
+		'''
 		data = self.grasp(url)
 		if data is None:
 			return []

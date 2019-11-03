@@ -38,7 +38,7 @@ condi_cj_nj = [['p1p2p7p8', 'p3', 'p4', 'p5', 'p6'],
 args_cj_nj = []
 [[args_cj_nj.append(f) for f in product([area_cj_nj[i], ], condi_cj_nj[i])] for i in range(7)]
 
-filtepath = './'
+filtepath = 'G:\\WebData\\ChinaHouse\\'
 configs = {'DataSavePath':filtepath,
            'SuzhouLiaJia':{'CJ':args_cj,
 		                   'ESF':args_esf,

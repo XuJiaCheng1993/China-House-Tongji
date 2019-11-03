@@ -20,17 +20,17 @@ file_path = myconfigs['DataSavePath']
 
 
 lj_params = myconfigs['SuzhouLiaJia']
-for i in range(4):
+for i in [1, 2]:
 	lj_spider = LianjiaSpider(file_path=file_path, city='苏州', types=types_[i])
 	for args in lj_params[types_alias[i]]:
 		lj_spider.run('url', *args)
 	lj_spider.run('information')
 	del lj_spider
 
-wj_params = myconfigs['Suzhou5i5j']
-for i in range(4):
-	wj_spider = WoAiWoJiaSpider(file_path=file_path, city='苏州', types=types_[i])
-	for args in wj_params[types_alias[i]]:
-		wj_spider.run('url', *args)
-	wj_spider.run('information')
-	del wj_spider
+# wj_params = myconfigs['Suzhou5i5j']
+# for i in range(4):
+# 	wj_spider = WoAiWoJiaSpider(file_path=file_path, city='苏州', types=types_[i])
+# 	for args in wj_params[types_alias[i]]:
+# 		wj_spider.run('url', *args)
+# 	wj_spider.run('information')
+# 	del wj_spider
